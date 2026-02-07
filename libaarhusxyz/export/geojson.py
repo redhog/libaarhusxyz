@@ -5,9 +5,9 @@ import json
 
 def to_geojson_str(model, simplify=None):
     xy = gpd.points_from_xy(
-        model.flightlines.x_web, 
-        model.flightlines.y_web,
-        crs = 3857)
+        model.flightlines.lon,
+        model.flightlines.lat,
+        crs = 4326)
     points = gpd.GeoDataFrame(model.flightlines.copy(), geometry = xy)
     lines = points.groupby(model.line_id_column)['geometry'].apply(
         lambda x: shapely.geometry.linestring.LineString(x.tolist()))
