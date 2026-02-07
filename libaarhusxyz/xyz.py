@@ -223,7 +223,21 @@ class XYZ(object):
 
         from .export import vtk
         vtk.dump(self, nameorfile, *arg, **kw)
-        
+
+    def to_glb(self, nameorfile, *arg, **kw):
+        """Write a 3d model to binary glTF (GLB) file (only works for resistivity models,
+        not data!).
+
+        nameorfile: either a file path as a string, or an open file object
+        to write the GLB file to.
+
+        attr_out: attributes (column names in flightlines, keys in
+        layer_data) to include in output.
+        """
+
+        from .export import glb
+        glb.dump(self, nameorfile, *arg, **kw)
+
     @property
     def title(self):
         return self.model_info.get("title", self.model_info.get("source", "Unknown"))
