@@ -235,7 +235,7 @@ def normalize_depths(model):
             layer_dfs["dep_bot"] = np.cumsum(layer_dfs['height'],axis=1)
         else:
             ldf = next(iter(layer_dfs.values()))
-            if ldf:
+            if not ldf.empty:
                 layer_dfs["dep_bot"] = np.nan*ldf
             else:
                 return
@@ -263,7 +263,7 @@ def calculate_height(model):
 def calculate_doi_layer(model):
     df = model.flightlines
     layer_dfs = model.layer_data
-    if "dep_bot" in layer_dfs:
+    if "dep_bot" in layer_dfs and "doi_lower" in df.columns and "doi_upper" in df.columns:
         doi_lower = np.meshgrid(layer_dfs["dep_bot"].columns, df["doi_lower"])[1]
         doi_upper = np.meshgrid(layer_dfs["dep_bot"].columns, df["doi_upper"])[1]
 
