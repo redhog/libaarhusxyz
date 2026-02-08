@@ -5,11 +5,11 @@ import numpy as np
 from scipy.interpolate import interp1d
 from datetime import datetime
 
-def _compute_xdist(fl):
+def _compute_xdist(fl, x_col, y_col):
     fl["prevdist"] = np.append(
         [0],
-        np.sqrt(  (fl["x"].values[1:] - fl["x"].values[:-1])**2
-                + (fl["y"].values[1:] - fl["y"].values[:-1])**2))
+        np.sqrt(  (fl[x_col].values[1:] - fl[x_col].values[:-1])**2
+                + (fl[y_col].values[1:] - fl[y_col].values[:-1])**2))
     fl.loc[np.append([False], fl["title"].values[1:] != fl["title"].values[:-1]), "prevdist"] = 0
     fl["xdist"] = fl.groupby(fl["title"])["prevdist"].cumsum()
 
@@ -29,20 +29,20 @@ def _compute_sounding_widths(fl):
     fl["left"] = (fl["prev_xdist"] + fl["xdist"]) / 2
     fl["right"] = (fl["xdist"] + fl["next_xdist"]) / 2
 
-def _generate_cells(fl, df):
-    #convert xdist along line to appropriate X, Y, and topo values 
+def _generate_cells(fl, df, x_col, y_col, z_col):
+    #convert xdist along line to appropriate X, Y, and topo values
     titles = fl['title'].unique()
-    columns = ['x','y','topo']
+    columns = [(x_col, 'x'), (y_col, 'y'), (z_col, 'topo')]
 
     for ln in titles:
         mask_ln = fl.title == ln
         xdist = fl.loc[mask_ln, 'xdist'].values
 
-        for col in columns:
-            col_vals = fl.loc[mask_ln, col].values
+        for src_col, dest_prefix in columns:
+            col_vals = fl.loc[mask_ln, src_col].values
             interp_func = interp1d(xdist, col_vals, fill_value=(col_vals[0],col_vals[-1]))
-            fl.loc[mask_ln, col+'_left'] = interp_func(fl.loc[mask_ln, 'left'])
-            fl.loc[mask_ln, col+'_right'] = interp_func(fl.loc[mask_ln, 'right'])
+            fl.loc[mask_ln, dest_prefix+'_left'] = interp_func(fl.loc[mask_ln, 'left'])
+            fl.loc[mask_ln, dest_prefix+'_right'] = interp_func(fl.loc[mask_ln, 'right'])
 
     cells = df.merge(fl, left_on='record', right_index=True)
     cells.loc[:,'z_bot_left'] = cells.topo_left-cells.dep_bot
@@ -148,11 +148,19 @@ def _dump(model, fid, attr_out = ['resistivity', 'resistivity_variance_factor','
 
     fl = model.flightlines
 
+    # Get column names based on current naming standard
+    x_col = model.x_column
+    y_col = model.y_column
+    z_col = model.z_column
+
+    if not x_col or not y_col or not z_col:
+        raise ValueError(f"Missing required coordinate columns. Found: x={x_col}, y={y_col}, z={z_col}")
+
     df = _flatten_layer_data(model)
 
-    _compute_xdist(fl)
+    _compute_xdist(fl, x_col, y_col)
     _compute_sounding_widths(fl)
-    cells = _generate_cells(fl, df)
+    cells = _generate_cells(fl, df, x_col, y_col, z_col)
     points_array = _generate_points_array(cells)
 
     point_coordinates, cell_indices_np, cells_out_vtk, cell_types_out_vtk = _vtk_cell_data(points_array)

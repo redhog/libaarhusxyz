@@ -149,11 +149,20 @@ def _dump(model, fid, attr_out=['resistivity', 'resistivity_variance_factor', 'l
         model.layer_data["dep_bot"] = model.layer_data["dep_bot"].replace([np.inf, -np.inf, np.nan], last_layer_val)
 
     fl = model.flightlines
+
+    # Get column names based on current naming standard
+    x_col = model.x_column
+    y_col = model.y_column
+    z_col = model.z_column
+
+    if not x_col or not y_col or not z_col:
+        raise ValueError(f"Missing required coordinate columns. Found: x={x_col}, y={y_col}, z={z_col}")
+
     df = _flatten_layer_data(model)
 
-    _compute_xdist(fl)
+    _compute_xdist(fl, x_col, y_col)
     _compute_sounding_widths(fl)
-    cells = _generate_cells(fl, df)
+    cells = _generate_cells(fl, df, x_col, y_col, z_col)
     points_array = _generate_points_array(cells)
 
     point_coordinates, cell_indices_np, cells_out_vtk, cell_types_out_vtk = _vtk_cell_data(points_array)
