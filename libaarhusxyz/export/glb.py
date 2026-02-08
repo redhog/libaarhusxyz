@@ -160,9 +160,14 @@ def _dump(model, fid, attr_out=['resistivity', 'resistivity_variance_factor', 'l
 
     df = _flatten_layer_data(model)
 
-    _compute_xdist(fl, x_col, y_col)
-    _compute_sounding_widths(fl)
-    cells = _generate_cells(fl, df, x_col, y_col, z_col)
+    # Get line_id column name
+    line_id_col = model.line_id_column
+    if not line_id_col:
+        raise ValueError("No line ID column found. Expected one of: title, Line, line, line_id, line_no")
+
+    _compute_xdist(fl, x_col, y_col, line_id_col)
+    _compute_sounding_widths(fl, line_id_col)
+    cells = _generate_cells(fl, df, x_col, y_col, z_col, line_id_col)
     points_array = _generate_points_array(cells)
 
     point_coordinates, cell_indices_np, cells_out_vtk, cell_types_out_vtk = _vtk_cell_data(points_array)

@@ -5,23 +5,23 @@ import numpy as np
 from scipy.interpolate import interp1d
 from datetime import datetime
 
-def _compute_xdist(fl, x_col, y_col):
+def _compute_xdist(fl, x_col, y_col, line_id_col):
     fl["prevdist"] = np.append(
         [0],
         np.sqrt(  (fl[x_col].values[1:] - fl[x_col].values[:-1])**2
                 + (fl[y_col].values[1:] - fl[y_col].values[:-1])**2))
-    fl.loc[np.append([False], fl["title"].values[1:] != fl["title"].values[:-1]), "prevdist"] = 0
-    fl["xdist"] = fl.groupby(fl["title"])["prevdist"].cumsum()
+    fl.loc[np.append([False], fl[line_id_col].values[1:] != fl[line_id_col].values[:-1]), "prevdist"] = 0
+    fl["xdist"] = fl.groupby(fl[line_id_col])["prevdist"].cumsum()
 
-def _compute_sounding_widths(fl):
-    #compute appropriate start and end points along line in terms of xdistance 
-    fl["next_title"] = fl["title"].shift(-1).fillna(-1)
-    fl["prev_title"] = fl["title"].shift(1).fillna(-1)
+def _compute_sounding_widths(fl, line_id_col):
+    #compute appropriate start and end points along line in terms of xdistance
+    fl["next_title"] = fl[line_id_col].shift(-1).fillna(-1)
+    fl["prev_title"] = fl[line_id_col].shift(1).fillna(-1)
     fl["next_xdist"] = fl["xdist"].shift(-1).fillna(fl.iloc[-1]["xdist"])
     fl["prev_xdist"] = fl["xdist"].shift(1).fillna(0)
 
-    fl.loc[fl["title"] != fl["prev_title"], "prev_xdist"] = fl.loc[fl["title"] != fl["prev_title"], "xdist"]
-    fl.loc[fl["title"] != fl["next_title"], "next_xdist"] = fl.loc[fl["title"] != fl["next_title"], "xdist"]
+    fl.loc[fl[line_id_col] != fl["prev_title"], "prev_xdist"] = fl.loc[fl[line_id_col] != fl["prev_title"], "xdist"]
+    fl.loc[fl[line_id_col] != fl["next_title"], "next_xdist"] = fl.loc[fl[line_id_col] != fl["next_title"], "xdist"]
 
     fl.loc[fl["xdist"] - fl["prev_xdist"] > 50, "prev_xdist"] = fl.loc[fl["xdist"] - fl["prev_xdist"] > 50, "xdist"] - 50
     fl.loc[fl["next_xdist"] - fl["xdist"] > 50, "next_xdist"] = fl.loc[fl["next_xdist"] - fl["xdist"] > 50, "xdist"] + 50
@@ -29,13 +29,13 @@ def _compute_sounding_widths(fl):
     fl["left"] = (fl["prev_xdist"] + fl["xdist"]) / 2
     fl["right"] = (fl["xdist"] + fl["next_xdist"]) / 2
 
-def _generate_cells(fl, df, x_col, y_col, z_col):
+def _generate_cells(fl, df, x_col, y_col, z_col, line_id_col):
     #convert xdist along line to appropriate X, Y, and topo values
-    titles = fl['title'].unique()
+    titles = fl[line_id_col].unique()
     columns = [(x_col, 'x'), (y_col, 'y'), (z_col, 'topo')]
 
     for ln in titles:
-        mask_ln = fl.title == ln
+        mask_ln = fl[line_id_col] == ln
         xdist = fl.loc[mask_ln, 'xdist'].values
 
         for src_col, dest_prefix in columns:
@@ -158,9 +158,14 @@ def _dump(model, fid, attr_out = ['resistivity', 'resistivity_variance_factor','
 
     df = _flatten_layer_data(model)
 
-    _compute_xdist(fl, x_col, y_col)
-    _compute_sounding_widths(fl)
-    cells = _generate_cells(fl, df, x_col, y_col, z_col)
+    # Get line_id column name
+    line_id_col = model.line_id_column
+    if not line_id_col:
+        raise ValueError("No line ID column found. Expected one of: title, Line, line, line_id, line_no")
+
+    _compute_xdist(fl, x_col, y_col, line_id_col)
+    _compute_sounding_widths(fl, line_id_col)
+    cells = _generate_cells(fl, df, x_col, y_col, z_col, line_id_col)
     points_array = _generate_points_array(cells)
 
     point_coordinates, cell_indices_np, cells_out_vtk, cell_types_out_vtk = _vtk_cell_data(points_array)
