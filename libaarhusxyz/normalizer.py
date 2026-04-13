@@ -240,6 +240,17 @@ def normalize_depths(model):
             else:
                 return
 
+    # Detect sign convention: standard is positive-downward (depth below surface).
+    # Some sources (e.g. SimPEG) use negative-downward (elevation offset from topo).
+    # If the median of finite, non-zero dep_bot values is negative, negate both
+    # dep_bot and dep_top to convert to the standard positive-downward convention.
+    finite_bot = layer_dfs["dep_bot"].values.ravel()
+    finite_bot = finite_bot[np.isfinite(finite_bot) & (finite_bot != 0)]
+    if len(finite_bot) > 0 and np.median(finite_bot) < 0:
+        layer_dfs["dep_bot"] = -layer_dfs["dep_bot"]
+        if "dep_top" in layer_dfs:
+            layer_dfs["dep_top"] = -layer_dfs["dep_top"]
+
     layer_dfs["dep_bot"] = layer_dfs["dep_bot"].fillna(np.inf)
     if 'dep_top' in layer_dfs.keys():
         layer_dfs["dep_top"] = layer_dfs["dep_top"].fillna(np.inf)
