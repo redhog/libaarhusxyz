@@ -48,10 +48,10 @@ segment,segments,
 ,,
 sigma_i,sigma,
 height,thk,
-resistivity,rho_i,
-resistivity,rho,
-resistivity_variance_factor,rho_i_std,
-resistivity_variance_factor,rho_std,
+resistivity,rho_i,rho
+resistivity,rho,rho
+resistivity_variance_factor,rho_i_std,rho_std
+resistivity_variance_factor,rho_std,rho_std
 gate times (s),gate times,
 ,,
 number of layers,numlayer,
