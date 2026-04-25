@@ -236,7 +236,7 @@ def normalize_depths(model):
         else:
             ldf = next(iter(layer_dfs.values()))
             if not ldf.empty:
-                layer_dfs["dep_bot"] = np.nan*ldf
+                layer_dfs["dep_bot"] = np.nan*(ldf.astype(float))
             else:
                 return
 
