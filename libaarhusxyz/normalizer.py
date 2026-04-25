@@ -230,6 +230,8 @@ def add_defaults(model, required_columns=None):
             
 def normalize_depths(model):
     layer_dfs = model.layer_data
+    if not any(k in layer_dfs for k in ('dep_bot', 'dep_top', 'height', 'resistivity')):
+        return
     if "dep_bot" not in layer_dfs:
         if 'height' in layer_dfs:
             layer_dfs["dep_bot"] = np.cumsum(layer_dfs['height'],axis=1)
