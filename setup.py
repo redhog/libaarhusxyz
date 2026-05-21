@@ -5,7 +5,7 @@ import os
 
 setuptools.setup(
     name='libaarhusxyz',
-    version='0.0.42',
+    version='0.0.43',
     description='Parser for the Aarhus Workbench XYZ format for geophysical data',
     long_description="""Parser for the Aarhus Workbench XYZ format for geophysical data""",
     long_description_content_type="text/markdown",
@@ -21,6 +21,8 @@ setuptools.setup(
         "pyproj",
         "matplotlib",
         "pygltflib"
+        "msgpack",
+        "msgpack-numpy"
     ],
     extras_require={
         'normalisation': ["pyproj", "projnames"],

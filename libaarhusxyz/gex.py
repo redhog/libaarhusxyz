@@ -54,7 +54,9 @@ def parse_parameters(textlines):
     for key in section.keys():
         if len(section[key])==1:
             section[key]=section[key][0]
-        if len(section[key])==1:
+        if isinstance(section[key], list) and len(section[key])==0:
+            section[key]=""
+        elif len(section[key])==1:
             section[key]=section[key][0]
         else:
             section[key]=np.array(section[key])
@@ -66,12 +68,30 @@ def _parse(inputfile):
     for header in sectionheaders:
         gex[header.strip("[").strip("]")]=parse_parameters(sections[header])
         print("header {} parsed".format(header))
+    # Compute TxLoopArea from TxLoopSides if not directly provided (e.g. HeliTEM, VTEM)
+    if "TxLoopArea" not in gex["General"] and "TxLoopSides" in gex["General"]:
+        sides = gex["General"]["TxLoopSides"]
+        if isinstance(sides, np.ndarray):
+            gex["General"]["TxLoopArea"] = sides[0] * sides[1]
+        else:
+            gex["General"]["TxLoopArea"] = sides * sides
+
     number_channels = np.array(["Channel" in key for key in gex.keys()]).sum()
     for channel in range(1, 1 + number_channels):
         channel_key = f"Channel{channel}"
         tx_mom = gex[channel_key].get('TransmitterMoment', None)
-        assert tx_mom is not None, f"gex[{channel_key}]['TransmitterMoment'] does not exist in the Gexfile"
-        turn_key = f"NumberOfTurns{tx_mom}"
+
+        # For single-moment systems (HeliTEM, VTEM), TransmitterMoment may be absent
+        # or NumberOfTurns may lack the LM/HM suffix. Fall back to plain NumberOfTurns.
+        if tx_mom is not None:
+            turn_key = f"NumberOfTurns{tx_mom}"
+            if turn_key not in gex["General"]:
+                turn_key = "NumberOfTurns"
+        else:
+            turn_key = "NumberOfTurns"
+
+        assert turn_key in gex["General"], f"gex['General']['{turn_key}'] does not exist in the Gexfile"
+        assert "TxLoopArea" in gex["General"], "gex['General']['TxLoopArea'] does not exist and could not be computed from TxLoopSides"
         gex[channel_key]['ApproxDipoleMoment'] = gex["General"][turn_key] * gex["General"]["TxLoopArea"] * gex[channel_key]["TxApproximateCurrent"]
     return gex
 
@@ -101,7 +121,9 @@ def _dump(gex, f, columns=None):
             a=gex[key1][key2]
             # the follwoing is a mess because the required format is depending on the paramter 
             if type(a) is np.ndarray:
-                if type(a[0]) is np.str_:
+                if a.size == 0:
+                    lines.append('{0}='.format(key2))
+                elif type(a[0]) is np.str_:
                     lines.append('{0}={1}'.format(key2, ' '.join(['{}'.format(item) for item in a[:] ]))) 
                 elif a.ndim==1:
                     digits=1
@@ -121,8 +143,8 @@ def _dump(gex, f, columns=None):
                         else:
                             lines.append(('{0}{1:0'+str(digits)+'d}=\t{2}').format(key2, n+1, '\t'.join(['{}'.format(item) for item in row ])) )
             elif type(a) is float:
-                if key2 in ['GateNoForPowerLineMonitor', 'RemoveInitialGates', 'NumberOfTurnsLM', 
-                            'NumberOfTurnsHM','LoopType' , 'RxCoilNumber', 'NoGates', 'RemoveInitialGates',
+                if key2 in ['GateNoForPowerLineMonitor', 'RemoveInitialGates', 'NumberOfTurnsLM',
+                            'NumberOfTurnsHM', 'NumberOfTurns', 'LoopType' , 'RxCoilNumber', 'NoGates', 'RemoveInitialGates',
                             'SystemResponseConvolution']:
                     lines.append('{0}={1}'.format(key2, int(a)))
                 else:

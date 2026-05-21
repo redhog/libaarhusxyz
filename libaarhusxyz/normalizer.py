@@ -4,12 +4,12 @@ import pyproj
 import re
 import datetime
 import csv
-import pkg_resources
+import importlib.resources
 
 def _read_csv(f):
     return pd.read_csv(f)
 
-with pkg_resources.resource_stream("libaarhusxyz", "normalizer.csv") as f:
+with importlib.resources.open_binary("libaarhusxyz", "normalizer.csv") as f:
     name_mapping = _read_csv(f)
 
 def complete_name_mapping(name_mapping):
@@ -25,7 +25,7 @@ def complete_name_mapping(name_mapping):
 
 complete_name_mapping(name_mapping)
     
-with pkg_resources.resource_stream("libaarhusxyz", "normalizer_pattern.csv") as f:
+with importlib.resources.open_binary("libaarhusxyz", "normalizer_pattern.csv") as f:
     name_mapping_patterns = _read_csv(f)
 
 def map_name_pattern(value):
@@ -264,7 +264,7 @@ def normalize_depths(model):
 def calculate_z(model):
     df = model.flightlines
     layer_dfs = model.layer_data
-    if "dep_bot" in layer_dfs:
+    if "dep_bot" in layer_dfs and model.z_column is not None:
         layer_dfs["z_bottom"] = np.meshgrid(layer_dfs["dep_bot"].columns, df[model.z_column])[1] - layer_dfs["dep_bot"]
         layer_dfs["z_top"] = np.meshgrid(layer_dfs["dep_top"].columns, df[model.z_column])[1] - layer_dfs["dep_top"]
 
