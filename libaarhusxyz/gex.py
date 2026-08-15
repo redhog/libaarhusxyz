@@ -257,7 +257,29 @@ class GEX(object):
 
 
     def __getattr__(self, name):
-        return self.gex_dict[name]
+        # Attribute lookup must raise AttributeError on a miss, not KeyError.
+        # Everything in the standard library that feature-detects by attribute
+        # probes for a dunder and reads AttributeError as "not provided" — so a
+        # KeyError here breaks copy, deepcopy and pickle.
+        #
+        # Two guards before the dict lookup, and both are load-bearing:
+        #
+        # 1. `gex_dict` itself. copy and pickle build the instance through
+        #    __new__ with an empty __dict__ and populate it afterwards, so until
+        #    then every attribute access lands here — including `gex_dict`.
+        #    Without this guard, `self.gex_dict` below recurses infinitely.
+        # 2. Dunders, which are feature detection and never real GEX fields.
+        #
+        # XYZ.__getattr__ already carries the equivalent guard for its own
+        # backing attributes; this is the same fix applied to the sibling class.
+        if name == "gex_dict":
+            raise AttributeError(name)
+        if name.startswith("__") and name.endswith("__"):
+            raise AttributeError(name)
+        try:
+            return self.gex_dict[name]
+        except KeyError:
+            raise AttributeError(name) from None
 
     def plot(self, ax=None):
         if ax is None:
@@ -282,12 +304,23 @@ class GEX(object):
         plt.tight_layout()
 
     def __repr__(self):
+        # A __repr__ exists to be safe to call from a debugger or a logger, so
+        # it must degrade rather than raise. A partial GEX — one still being
+        # assembled, or a fixture — has no header and may have no channels, and
+        # raising from inside repr() turns an unrelated failure into a confusing
+        # one (pytest reports it as "raised in repr()" and hides the real error).
+        try:
+            return self._describe()
+        except Exception as exc:
+            return "<GEX (not fully described: %s: %s)>" % (type(exc).__name__, exc)
+
+    def _describe(self):
         waveform = [self.transmitter_waveform(channel) for channel in range(1, 1 + self.number_channels)]
         input_times = [len(waveform[channel][:, 0]) for channel in range(self.number_channels)]
         gate_times = [len(self.gate_times(channel)[:, 0]) for channel in range(1, 1 + self.number_channels)]
-        
+
         return "\n".join([
-            (self.header or "[Unnamed system]"),
+            (getattr(self, "header", None) or "[Unnamed system]"),
             "--------------------------------",
             "Channels: %s" % self.number_channels,
             "\n".join([
