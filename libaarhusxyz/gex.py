@@ -38,7 +38,7 @@ def parse_parameters(textlines):
     for line in textlines:
         strings=line.split("=")
         if len(strings) > 1:
-            key=strings[0].rstrip("0123456789")
+            key=strings[0].strip().rstrip("0123456789")
             numberstrings=strings[1].split()
             try:
                 numbers=[float(s) for s in numberstrings]
