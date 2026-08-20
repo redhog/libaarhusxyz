@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+import re
 try:
     import projnames
 except:
@@ -392,23 +393,47 @@ class XYZ(object):
             if colname in self.flightlines.columns:
                 return colname
 
+    def _layer_data_name(self, *df_stubs):
+        """Resolve a channel-specific layer data key from naming-convention stubs.
+
+        The stubs are tried in order and the first one that matches wins, so
+        they should be listed in order of preference. Returns the key that was
+        matched, or None if no stub matches -- callers use that None as a
+        presence test.
+
+        A stub is a name fragment rather than a whole key: the libaarhusxyz
+        naming standard writes gate data as 'dbdt_ch1gt', so the stub
+        'dbdt_ch1' has to match a key carrying a suffix. The alc standard
+        writes 'Gate_Ch01', where the key and the stub happen to coincide.
+        The suffix is not fixed, so the stub is matched as a fragment, but it
+        must not be followed by another digit -- otherwise channel 1's
+        'dbdt_ch1' would also match channel 10's 'dbdt_ch10gt'.
+
+        Raises ValueError if a stub matches more than one key, since there is
+        then no single right answer to return.
+        """
+        for df_stub in df_stubs:
+            pattern = re.compile(re.escape(df_stub) + r'(?!\d)')
+            matches = [string for string in self.layer_data.keys() if pattern.search(string)]
+            if len(matches) > 1:
+                raise ValueError(
+                    "Ambiguous layer data for '%s': matches %s" % (
+                        df_stub, ", ".join(repr(match) for match in sorted(matches))))
+            if matches:
+                return matches[0]
+        return None
+
     def layer_data_data_name(self, channel: int = 1):
         str_channel = f"0{channel}"[-2:]
-        for df_stub in (f'dbdt_ch{channel}', f'Gate_Ch{str_channel}'):
-            if [string for string in self.layer_data.keys() if df_stub in string]:
-                return df_stub
+        return self._layer_data_name(f'dbdt_ch{channel}', f'Gate_Ch{str_channel}')
 
     def layer_data_std_name(self, channel: int = 1):
         str_channel = f"0{channel}"[-2:]
-        for df_stub in (f'dbdt_std_ch{channel}', f'STD_Ch{str_channel}'):
-            if [string for string in self.layer_data.keys() if df_stub in string]:
-                return df_stub
+        return self._layer_data_name(f'dbdt_std_ch{channel}', f'STD_Ch{str_channel}')
 
     def layer_data_inuse_name(self, channel: int = 1):
         str_channel = f"0{channel}"[-2:]
-        for df_stub in (f'dbdt_inuse_ch{channel}', f'InUse_Ch{str_channel}'):
-            if [string for string in self.layer_data.keys() if df_stub in string]:
-                return df_stub
+        return self._layer_data_name(f'dbdt_inuse_ch{channel}', f'InUse_Ch{str_channel}')
 
     def plot_line(self, line_no, ax=None, **kw):
         """Plots a single flightline as a cross-section using matplotlib. Any extra
